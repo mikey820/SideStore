@@ -60,5 +60,5 @@
     branch = main
 [submodule "Dependencies/AltSign"]
     path = Dependencies/AltSign
-    url = https://github.com/SideStore/AltSign
+    url = https://github.com/mikey820/AltSign
     branch = master

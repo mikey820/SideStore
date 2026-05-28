@@ -43,6 +43,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     private let viewAppIntentHandler = ViewAppIntentHandler()
     
     public let consoleLog = ConsoleLog()
+    private var pendingImportIPAURL: URL?
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool
     {
@@ -145,6 +146,13 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         if UserDefaults.standard.enableEMPforWireguard {
             startEMProxy(bind_addr: AppConstants.Proxy.serverURL)
         }
+    }
+    
+    func applicationDidBecomeActive(_ application: UIApplication)
+    {
+        guard let url = pendingImportIPAURL else { return }
+        pendingImportIPAURL = nil
+        NotificationCenter.default.post(name: AppDelegate.importAppDeepLinkNotification, object: nil, userInfo: [AppDelegate.importAppDeepLinkURLKey: url])
     }
     
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any]) -> Bool
@@ -253,7 +261,11 @@ private extension AppDelegate
                 return false
             }
             
-            NotificationCenter.default.post(name: AppDelegate.importAppDeepLinkNotification, object: nil, userInfo: [AppDelegate.importAppDeepLinkURLKey: ipaURL])
+            if UIApplication.shared.applicationState == .active {
+                NotificationCenter.default.post(name: AppDelegate.importAppDeepLinkNotification, object: nil, userInfo: [AppDelegate.importAppDeepLinkURLKey: ipaURL])
+            } else {
+                pendingImportIPAURL = ipaURL
+            }
             
             return true
         }

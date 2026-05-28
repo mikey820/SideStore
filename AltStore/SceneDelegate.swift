@@ -14,6 +14,7 @@ import AltStoreCore
 final class SceneDelegate: UIResponder, UIWindowSceneDelegate
 {
     var window: UIWindow?
+    private var pendingImportIPAURL: URL?
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions)
     {
@@ -26,6 +27,13 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate
         {
             self.open(context)
         }
+    }
+    
+    func sceneDidBecomeActive(_ scene: UIScene)
+    {
+        guard let url = pendingImportIPAURL else { return }
+        pendingImportIPAURL = nil
+        NotificationCenter.default.post(name: AppDelegate.importAppDeepLinkNotification, object: nil, userInfo: [AppDelegate.importAppDeepLinkURLKey: url])
     }
 
     func sceneWillEnterForeground(_ scene: UIScene)
@@ -110,7 +118,11 @@ private extension SceneDelegate
                 return
             }
             
-            NotificationCenter.default.post(name: AppDelegate.importAppDeepLinkNotification, object: nil, userInfo: [AppDelegate.importAppDeepLinkURLKey: ipa])
+            if UIApplication.shared.applicationState == .active {
+                NotificationCenter.default.post(name: AppDelegate.importAppDeepLinkNotification, object: nil, userInfo: [AppDelegate.importAppDeepLinkURLKey: ipa])
+            } else {
+                pendingImportIPAURL = ipa
+            }
         }
         else
         {

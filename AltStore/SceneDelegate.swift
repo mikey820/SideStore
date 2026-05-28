@@ -87,23 +87,30 @@ private extension SceneDelegate
         if context.url.isFileURL
         {
             guard context.url.pathExtension.lowercased() == "ipa" else { return }
-            if !context.url.startAccessingSecurityScopedResource() { return }
+            if !context.url.startAccessingSecurityScopedResource() {
+                print("[ALTLog] Failed to access security-scoped resource for imported IPA")
+                return
+            }
             defer { context.url.stopAccessingSecurityScopedResource() }
 
             let temporaryDirectory = FileManager.default.uniqueTemporaryURL()
             do {
-                try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true, attributes: nil) }
-            catch { return }
+                try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true, attributes: nil)
+            } catch {
+                print("[ALTLog] Failed to create temp directory for imported IPA: \(error)")
+                return
+            }
 
             let ipa = temporaryDirectory.appendingPathComponent(context.url.lastPathComponent)
             
             do {
                 try FileManager.default.copyItem(at: context.url, to: ipa)
-            } catch { return }
-            
-            DispatchQueue.main.async {
-                NotificationCenter.default.post(name: AppDelegate.importAppDeepLinkNotification, object: nil, userInfo: [AppDelegate.importAppDeepLinkURLKey: ipa])
+            } catch {
+                print("[ALTLog] Failed to copy imported IPA: \(error)")
+                return
             }
+            
+            NotificationCenter.default.post(name: AppDelegate.importAppDeepLinkNotification, object: nil, userInfo: [AppDelegate.importAppDeepLinkURLKey: ipa])
         }
         else
         {
@@ -132,42 +139,32 @@ private extension SceneDelegate
                 default: return
                 }
                 
-                DispatchQueue.main.async {
-                    NotificationCenter.default.post(name: AppDelegate.appBackupDidFinish, object: nil, userInfo: [AppDelegate.appBackupResultKey: result])
-                }
+                NotificationCenter.default.post(name: AppDelegate.appBackupDidFinish, object: nil, userInfo: [AppDelegate.appBackupResultKey: result])
                 
             case "install":
                 let queryItems = components.queryItems?.reduce(into: [String: String]()) { $0[$1.name.lowercased()] = $1.value } ?? [:]
                 guard let downloadURLString = queryItems["url"], let downloadURL = URL(string: downloadURLString) else { return }
                 
-                DispatchQueue.main.async {
-                    NotificationCenter.default.post(name: AppDelegate.importAppDeepLinkNotification, object: nil, userInfo: [AppDelegate.importAppDeepLinkURLKey: downloadURL])
-                }
+                NotificationCenter.default.post(name: AppDelegate.importAppDeepLinkNotification, object: nil, userInfo: [AppDelegate.importAppDeepLinkURLKey: downloadURL])
             
             case "source":
                 let queryItems = components.queryItems?.reduce(into: [String: String]()) { $0[$1.name.lowercased()] = $1.value } ?? [:]
                 guard let sourceURLString = queryItems["url"], let sourceURL = URL(string: sourceURLString) else { return }
                 
-                DispatchQueue.main.async {
-                    NotificationCenter.default.post(name: AppDelegate.addSourceDeepLinkNotification, object: nil, userInfo: [AppDelegate.addSourceDeepLinkURLKey: sourceURL])
-                }
+                NotificationCenter.default.post(name: AppDelegate.addSourceDeepLinkNotification, object: nil, userInfo: [AppDelegate.addSourceDeepLinkURLKey: sourceURL])
                 
             case "pairing":
                 let queryItems = components.queryItems?.reduce(into: [String: String]()) { $0[$1.name.lowercased()] = $1.value } ?? [:]
                 Logger.main.info("queryItems \(queryItems)")
                 guard let callbackTemplate = queryItems["urlname"]?.removingPercentEncoding else { return }
                 
-                DispatchQueue.main.async {
-                    exportPairingFile(callbackTemplate)
-                }
+                exportPairingFile(callbackTemplate)
                 
             case "certificate":
                 let queryItems = components.queryItems?.reduce(into: [String: String]()) { $0[$1.name.lowercased()] = $1.value } ?? [:]
                 guard let callbackTemplate = queryItems["callback_template"]?.removingPercentEncoding else { return }
                 
-                DispatchQueue.main.async {
-                    NotificationCenter.default.post(name: AppDelegate.exportCertificateNotification, object: nil, userInfo: [AppDelegate.exportCertificateCallbackTemplateKey: callbackTemplate])
-                }
+                NotificationCenter.default.post(name: AppDelegate.exportCertificateNotification, object: nil, userInfo: [AppDelegate.exportCertificateCallbackTemplateKey: callbackTemplate])
 
             default: break
             }

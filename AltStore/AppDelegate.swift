@@ -149,7 +149,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any]) -> Bool
     {
-        return self.open(url)
+        return self.open(url, options: options)
     }
     
     func application(_ application: UIApplication, handlerFor intent: INIntent) -> Any?
@@ -225,15 +225,35 @@ private extension AppDelegate
         }
     }
     
-    func open(_ url: URL) -> Bool
+    func open(_ url: URL, options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool
     {
         if url.isFileURL
         {
             guard url.pathExtension.lowercased() == "ipa" else { return false }
             
-            DispatchQueue.main.async {
-                NotificationCenter.default.post(name: AppDelegate.importAppDeepLinkNotification, object: nil, userInfo: [AppDelegate.importAppDeepLinkURLKey: url])
+            let didStartAccessing = url.startAccessingSecurityScopedResource()
+            defer { 
+                if didStartAccessing { url.stopAccessingSecurityScopedResource() }
             }
+            
+            let temporaryDirectory = FileManager.default.uniqueTemporaryURL()
+            do {
+                try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true, attributes: nil)
+            } catch {
+                print("[ALTLog] Failed to create temp directory for imported IPA: \(error)")
+                return false
+            }
+            
+            let ipaURL = temporaryDirectory.appendingPathComponent(url.lastPathComponent)
+            
+            do {
+                try FileManager.default.copyItem(at: url, to: ipaURL)
+            } catch {
+                print("[ALTLog] Failed to copy imported IPA: \(error)")
+                return false
+            }
+            
+            NotificationCenter.default.post(name: AppDelegate.importAppDeepLinkNotification, object: nil, userInfo: [AppDelegate.importAppDeepLinkURLKey: ipaURL])
             
             return true
         }
@@ -272,9 +292,7 @@ private extension AppDelegate
                 let queryItems = components.queryItems?.reduce(into: [String: String]()) { $0[$1.name.lowercased()] = $1.value } ?? [:]
                 guard let downloadURLString = queryItems["url"], let downloadURL = URL(string: downloadURLString) else { return false }
                 
-                DispatchQueue.main.async {
-                    NotificationCenter.default.post(name: AppDelegate.importAppDeepLinkNotification, object: nil, userInfo: [AppDelegate.importAppDeepLinkURLKey: downloadURL])
-                }
+                NotificationCenter.default.post(name: AppDelegate.importAppDeepLinkNotification, object: nil, userInfo: [AppDelegate.importAppDeepLinkURLKey: downloadURL])
                 
                 return true
             
@@ -282,9 +300,7 @@ private extension AppDelegate
                 let queryItems = components.queryItems?.reduce(into: [String: String]()) { $0[$1.name.lowercased()] = $1.value } ?? [:]
                 guard let sourceURLString = queryItems["url"], let sourceURL = URL(string: sourceURLString) else { return false }
                 
-                DispatchQueue.main.async {
-                    NotificationCenter.default.post(name: AppDelegate.addSourceDeepLinkNotification, object: nil, userInfo: [AppDelegate.addSourceDeepLinkURLKey: sourceURL])
-                }
+                NotificationCenter.default.post(name: AppDelegate.addSourceDeepLinkNotification, object: nil, userInfo: [AppDelegate.addSourceDeepLinkURLKey: sourceURL])
                 
                 return true
                 
@@ -292,9 +308,7 @@ private extension AppDelegate
                 let queryItems = components.queryItems?.reduce(into: [String: String]()) { $0[$1.name.lowercased()] = $1.value } ?? [:]
                 guard let callbackTemplate = queryItems["urlName"]?.removingPercentEncoding else { return false }
                 
-                DispatchQueue.main.async {
-                    exportPairingFile(callbackTemplate)
-                }
+                exportPairingFile(callbackTemplate)
                 
                 return true
             
@@ -302,9 +316,7 @@ private extension AppDelegate
                 let queryItems = components.queryItems?.reduce(into: [String: String]()) { $0[$1.name.lowercased()] = $1.value } ?? [:]
                 guard let callbackTemplate = queryItems["callback_template"]?.removingPercentEncoding else { return false }
                 
-                DispatchQueue.main.async {
-                    NotificationCenter.default.post(name: AppDelegate.exportCertificateNotification, object: nil, userInfo: [AppDelegate.exportCertificateCallbackTemplateKey: callbackTemplate])
-                }
+                NotificationCenter.default.post(name: AppDelegate.exportCertificateNotification, object: nil, userInfo: [AppDelegate.exportCertificateCallbackTemplateKey: callbackTemplate])
                 
                 return true
                 
